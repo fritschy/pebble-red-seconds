@@ -1,0 +1,19 @@
+{
+  "uuid": "39c0c098-a4f3-49f4-bef8-a7f5c6fe7b04",
+  "shortName": "red-seconds",
+  "longName": "red-seconds",
+  "companyName": "fritschy.de",
+  "versionCode": 1,
+  "versionLabel": "1.0",
+  "sdkVersion": "3",
+  "targetPlatforms": ["basalt"],
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+    "dummy": 0
+  },
+  "resources": {
+    "media": []
+  }
+}
