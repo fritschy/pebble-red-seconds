@@ -20,6 +20,29 @@
 
 #include <pebble.h>
 
+#if 1
+#undef APP_LOG
+#define APP_LOG(...)
+#define START_TIME_MEASURE()
+#define END_TIME_MEASURE()
+#else
+static unsigned int get_time(void)
+{
+   time_t s;
+   uint16_t ms;
+   time_ms(&s, &ms);
+   return (s & 0xfffff) * 1000 + ms;
+}
+
+#define START_TIME_MEASURE() unsigned tm_0 = get_time()
+#define END_TIME_MEASURE()                                                  \
+   do                                                                       \
+   {                                                                        \
+      unsigned tm_1 = get_time();                                           \
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "%s: took %dms", __func__, tm_1 - tm_0); \
+   } while (0)
+#endif
+
 typedef struct {
    char day[3];
    uint8_t mon;
@@ -81,12 +104,13 @@ static void draw_simple_hand(GContext *ctx, HandInfo hi) {
 }
 
 static void update_effect_layer(Layer *l, GContext *ctx) {
+   START_TIME_MEASURE();
+
    time_t t = time(NULL);
    struct tm *tm = localtime(&t);
    int32_t sec = tm->tm_sec;
    int32_t min = tm->tm_min;
    int32_t hr = tm->tm_hour;
-   graphics_context_set_stroke_width(ctx, 1);
 
    // draw date
    graphics_context_set_text_color(ctx, GColorLightGray);
@@ -121,11 +145,7 @@ static void update_effect_layer(Layer *l, GContext *ctx) {
             .width = 3,
             .main_len = 144 / 2 - 15,
             .tail_len = 9,
-#ifdef SUBMINUTE_MINUTE_HAND
-            .angle = TRIG_MAX_ANGLE * (min * 60 + sec) / 3600,
-#else
             .angle = TRIG_MAX_ANGLE * min / 60,
-#endif
             .center = center,
             .color = GColorDarkGray});
 
@@ -142,7 +162,7 @@ static void update_effect_layer(Layer *l, GContext *ctx) {
    graphics_context_set_fill_color(ctx, GColorWhite);
    graphics_fill_circle(ctx, center, 3);
 
-   layer_mark_dirty(l);
+   END_TIME_MEASURE();
 }
 
 static void window_load(Window *window) {
@@ -159,7 +179,7 @@ static void window_load(Window *window) {
 
    effect_layer = layer_create(bounds);
    layer_set_update_proc(effect_layer, update_effect_layer);
-   layer_insert_above_sibling(effect_layer, bgl);
+   layer_add_child(bgl, effect_layer);
 }
 
 static void window_unload(Window *window) {
@@ -168,16 +188,16 @@ static void window_unload(Window *window) {
    layer_destroy(effect_layer);
 }
 
-static void handle_second_tick(struct tm *tick_time, TimeUnits units_changed) {
+static void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
    if (units_changed & DAY_UNIT) {
       update_date_info(tick_time);
    }
-   layer_mark_dirty(bitmap_layer_get_layer(bg_layer));
    layer_mark_dirty(effect_layer);
 }
 
 static void init(void) {
    window = window_create();
+   tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
    window_set_window_handlers(window,
                               (WindowHandlers){
                                  .load = window_load, .unload = window_unload,
@@ -189,8 +209,8 @@ static void init(void) {
    time_t t = time(NULL);
    struct tm *tm = localtime(&t);
    update_date_info(tm);
+
    window_stack_push(window, true);
-   tick_timer_service_subscribe(SECOND_UNIT, handle_second_tick);
 }
 
 static void deinit(void) { window_destroy(window); }
